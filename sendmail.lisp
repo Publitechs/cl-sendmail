@@ -38,6 +38,7 @@
 	   :subject
 	   :content-type
 	   :attachments
+           :with-email
 	   :other-headers
 	   :*smtp-server*
 	   :*smtp-port*
@@ -263,7 +264,7 @@
 
 (defun encode-attachment (data)
   (split-string (format nil "~A~A" #\return #\newline)
-                (base64-encode data)
+                (base64-string-to-string data)
                 75))
 
 
@@ -306,3 +307,40 @@
 	  ((eq char 'eof) (get-output-stream-string out))
 	(princ char out)))))
 
+
+(defmacro with-email ((stream to &key
+			      cc
+			      bcc
+			      subject
+			      from
+			      reply-to
+			      message-id
+			      in-reply-to
+			      references
+			      (type "text")
+			      (subtype "plain")
+			      attachments
+			      other-headers)
+		      &body body)
+  "Binds STREAM to a MAIL-OUTPUT-STREAM created according to the other 
+arguments then executes BODY within that context. Automatically closes
+the stream and sends the email upon completion."
+  `(let ((,stream (make-instance 'mail-output-stream
+				 :to ,to
+				 :cc ,cc
+				 :bcc ,bcc
+				 :subject ,subject
+				 :from ,from
+				 :reply-to ,reply-to
+				 :type ,type
+				 :subtype ,subtype
+				 :attachments ,attachments
+				 ;; :message-id ,message-id
+				 ;; :in-reply-to ,in-reply-to
+				 ;; :references ,references
+				 :other-headers ,other-headers
+                                 )))
+    (unwind-protect
+	 (progn
+	   ,@body)
+      (close ,stream))))
